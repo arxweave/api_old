@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",
+  "scripts": {
+    "start": "nodemon node arxweave_API.js"
+  },
   "dependencies": {
     "arweave": "^1.6.0",
     "aws-sdk": "^2.606.0",
@@ -13,5 +16,8 @@
     "fast-xml-parser": "^3.16.0",
     "he": "^1.2.0",
     "superagent": "^5.2.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.2"
   }
 }
