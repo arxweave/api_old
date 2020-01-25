@@ -28,6 +28,7 @@ function ArweaveService() {
         reward,
       }, jwk);
 
+      // This is really ugly but setting it during createTransaction fails.
       tags.forEach(t => tx.addTag(
         Object.keys(t)[0],
         Object.values(t)[0]
@@ -108,6 +109,13 @@ function ArweaveService() {
   }
 
 }
+
+/*
+  Example how to use service to take a string, with a content/type of html and
+  retrieve an url to the permadata https://arweave.net/tx/${tx.id}/data.html
+  Changing the `reward` by a multiple (x2 or x10) of the default value does not reduce
+  the processing time of the tx. On last run the tx processing time was ~ 4.5min
+*/
 
 async function main() {
   const s = ArweaveService()
