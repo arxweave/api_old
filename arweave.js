@@ -155,6 +155,6 @@ async function main() {
   }
 }
 
-main()
+// main() // NOTE: decomment for tests.
 
 module.exports = ArweaveService

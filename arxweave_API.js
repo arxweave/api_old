@@ -1,10 +1,14 @@
 const express = require('express')
-const body = require('body-parser') // FIXME: use json/urlencoded
-const AWS = require("aws-sdk")
+const AWS = require('aws-sdk')
 const axios = require('axios')
+const parser = require('fast-xml-parser')
+
+const ArweaveService = require('./arweave.js')()
 
 let app = express()
-app.use(body())
+
+app.use(express.urlencoded({extended: true}))
+app.use(express.json())
 
 const PORT = 8080
 
@@ -14,17 +18,19 @@ AWS.config.update({
 
 const dynamoDB = new AWS.DynamoDB()
 
-app.get('/', (req, res) => {
+app.get('/', (request, response) => {
   // TODO: max items to get
   // returns all items
   res.send('Hello world  ! ')
 })
 
-app.post('/new', async (req, res) => {
-  var params = {
+app.post('/new', async (request, response) => {
+  const arXivID = request.body.arXivID
+
+  const params = {
     TableName: 'Arxweave',
     Key: {
-      'arXivID': {S: req.body.arXivID}
+      'arXivID': {S: arXivID}
     }
   }
 
@@ -32,40 +38,38 @@ app.post('/new', async (req, res) => {
     if (err)
       console.log("Error", err)
     else {
+      // If object does not exists, add it in dynamoDB and Arweave.
       if(Object.keys(data).length === 0) {
-        axios.get(`https://export.arxiv.org/api/query?search_query=all&start=${START_ENTRY}&max_results=${NUMBER_OF_ENTRIES}`)
+        axios.get(`https://export.arxiv.org/api/query?id_list=${arXivID}`)
           .then(responseArxiv => parser.convertToJson(parser.getTraversalObj(responseArxiv.data, {}), {}).feed.entry)
-          .then(entriesJsonArrArxiv => entriesJsonArrArxiv.map(
-            entry => ({
-              PutRequest: {
-                Item: {
-                  'arXivID' : {S: entry.id},
-                  'authors' : {S: JSON.stringify(entry.author)},
-                  'updated' : {S: entry.updated},
-                  'published' : {S: entry.published},
-                  'title' : {S: entry.title},
-                  'summary' : {S: entry.summary},
-                  'pdf_link' : {S: entry.id.replace("abs", "pdf")}
-                }
-              }
-            })
-          ))
-          .then(entriesJsonArrForDBArxiv => dynamoDB.batchWriteItem({ RequestItems: { "Arxweave": entriesJsonArrForDBArxiv }}, (err, data) => {
+          .then(entry => dynamoDB.putItem({
+            TableName: 'Arxweave',
+            Item: {
+              'arXivID' : {S: arXivID},
+              'arXivURL' : {S: entry.id},
+              'authors' : {S: JSON.stringify(entry.author)},
+              'updated' : {S: entry.updated},
+              'published' : {S: entry.published},
+              'title' : {S: entry.title},
+              'summary' : {S: entry.summary},
+              'pdf_link' : {S: entry.id.replace("abs", "pdf")}
+            }
+          }, (err, data) => {
             if (err)
               console.log("Error", err)
             else
               console.log("Success", data)
-  }))
-  .catch(console.log)
-      } else res.send('This arXiv entry is already uploaded.')
+          }))
+          .then(() => ArweaveService.createDataTx({
+            data: `<html>${arXivID}</html>`, // TODO: put blob arXiv PDF.
+            tags: [{ 'Content-Type': 'text/html' }] // TODO: put arXiv metadata.
+          }))
+          .then(rawTx => ArweaveService.broadcastTx({ tx: rawTx }))
+          .then(broadcastedTx => response.send({msg: `Data is uploading to arweave with this broadcast ID ${broadcastedTx.id}.`}))
+          .catch(console.log)
+      } else response.send({msg: `This arXiv entry is already uploaded.`})
     }
   })
-
-  // TODO: call dynamoDB to check if exists
-  // if exists return this item is already uplaoded
-  // else get data from arXiv API and publish it on dynamoDB
-
-  // res.send('Hello world  !')
 })
 
 app.listen(PORT, () =>  {
