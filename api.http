@@ -1,0 +1,6 @@
+POST http://127.0.0.1:8080/new HTTP/1.1
+content-type: application/json
+
+{
+  "arXivID": "2001.08267"
+}
