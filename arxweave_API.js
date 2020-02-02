@@ -27,7 +27,7 @@ app.get('/', (request, response) => {
 })
 
 // Get single arXiv document
-app.get('/arxiv/:arXivID', (request, response) => {
+app.get('/arXivID/:arXivID', (request, response) => {
   const arXivID = request.params.arXivID
 
   const params = {
