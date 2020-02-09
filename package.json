@@ -4,7 +4,7 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "start": "nodemon node arxweave_API.js"
+    "start": "nodemon node server.js"
   },
   "dependencies": {
     "arweave": "^1.6.0",

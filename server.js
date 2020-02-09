@@ -20,10 +20,18 @@ AWS.config.update({
 const dynamoDB = new AWS.DynamoDB()
 
 // Get all arXiv documents
-app.get('/', (request, response) => {
-  // TODO: max items to get
-  // returns all items with pagination
-  res.send('Hello world !')
+// TODO: add pagination.
+app.get('/all', (request, response) => {
+  const params = {
+    TableName: 'Arxweave',
+    ProjectionExpression: 'arXivID, arXivURL, authors, broadcastedTxID, pdfLink, published, summary, title, statusArweave'
+  }
+
+  const docClient = new AWS.DynamoDB.DocumentClient()
+
+  // FIXME: show errors to console.log() .
+  docClient.scan(params, (err, data) => response.send(data !== null ? data.Items : `{msg: 'There is not any item.'}`)) // NOTE: 1MB limit.
+  // docClient.scan(params, (err, data) => console.log(err)) // NOTE: 1MB limit.
 })
 
 // Get single arXiv document
@@ -79,7 +87,17 @@ app.post('/new', async (request, response) => {
           const rawTx = await ArweaveService.createDataTx({
             data: arXivPdfBase64,
             reward: `${arweaveTxPrice.data}`,
-            tags: [{ 'Encode': 'base64', 'Content-Type': 'application/pdf' }] // TODO: put arXiv metadata.
+            tags: [{
+              'Encode': 'base64',
+              'Content-Type': 'application/pdf',
+              'arXivID': arXivID,
+              'authors': JSON.stringify(entry.author),
+              'updated': entry.updated,
+              'published': entry.published,
+              'title': entry.title,
+              'summary': entry.summary,
+              'pdfLink': entry.id.replace("abs", "pdf")
+            }]
           })
 
           const broadcastedTx = await ArweaveService.broadcastTx({ tx: rawTx })
@@ -89,7 +107,6 @@ app.post('/new', async (request, response) => {
               TableName: 'Arxweave',
               Item: {
                 'arXivID': {S: arXivID},
-                'arXivURL': {S: entry.id},
                 'authors': {S: JSON.stringify(entry.author)},
                 'updated': {S: entry.updated},
                 'published': {S: entry.published},
@@ -97,7 +114,7 @@ app.post('/new', async (request, response) => {
                 'summary': {S: entry.summary},
                 'pdfLink': {S: entry.id.replace("abs", "pdf")},
                 'broadcastedTxID': {S: broadcastedTx.id},
-                'status': {S: `${broadcastedTx.status}`}
+                'statusArweave': {S: `${broadcastedTx.status}`} // NOTE: status attribute is a dynamo name reserved.
               }
             }, (err, data) => {
               if (err)
